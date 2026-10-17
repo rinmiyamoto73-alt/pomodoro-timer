@@ -83,7 +83,8 @@
       position: absolute; inset: 0;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
     }
-    #time, #quickTime {
+    .sub-label { color: var(--muted); font-size: 15px; margin-top: 4px; }
+    #time, #quickTime, #waitTime {
       font-size: clamp(56px, 18vw, 76px); font-weight: 300;
       font-variant-numeric: tabular-nums; letter-spacing: 1px;
     }
@@ -156,6 +157,7 @@
 
     /* 画面切り替え */
     body[data-view="quick"] { --accent: #ffa94d; }
+    body[data-view="quick"][data-quick="wait"] { --accent: #9b8cff; }
     .view-switch {
       display: flex; background: var(--surface); padding: 4px; border-radius: 12px;
     }
@@ -272,13 +274,37 @@
   <section class="view" id="quickView" hidden>
     <!-- 選択画面 -->
     <div class="quick-pane" id="quickSetup">
-      <p class="lead">しんどい時は「ちょっとだけ」でOK<small>タイマーが鳴ったらやめていい。始めたらもう勝ち。</small></p>
+      <p class="lead">「あと◯分休んだらやる」って決めよう<small>それまではダラダラしてOK。鳴ったら合図。</small></p>
       <p class="q-title">なにする？</p>
       <div class="chips" id="taskChips"></div>
-      <p class="q-title">どれくらい？</p>
+      <p class="q-title">あと何分休む？</p>
+      <div class="chips" id="restChips"></div>
+      <p class="q-title">やる時間は？（ちょっとだけでOK）</p>
       <div class="chips" id="minChips"></div>
-      <button class="big-start" id="quickStart">とりあえず始める</button>
+      <button class="big-start" id="quickStart"></button>
       <div class="log" id="quickLog"></div>
+    </div>
+
+    <!-- 休憩中（鳴るまで待つ） -->
+    <div class="quick-pane" id="quickWait" hidden>
+      <div class="task-name" id="waitTask"></div>
+      <div class="ring">
+        <svg viewBox="0 0 220 220">
+          <circle class="track" cx="110" cy="110" r="100"/>
+          <circle class="progress" id="waitProgress" cx="110" cy="110" r="100"/>
+        </svg>
+        <div class="center">
+          <div id="waitTime">10:00</div>
+          <div id="waitLabel" class="sub-label">休憩中</div>
+        </div>
+      </div>
+      <div class="cheer" id="waitCheer"></div>
+      <div class="controls">
+        <button class="sub-btn" id="waitCancel" aria-label="やめる">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <button class="done-btn" id="waitNow">もう始める！</button>
+      </div>
     </div>
 
     <!-- 実行中 -->
@@ -577,16 +603,22 @@
     // ---- やる気スイッチ ----
     const DEFAULT_TASKS = ['🍽 皿洗い', '🛁 お風呂', '👕 洗濯', '🧹 片付け', '🪥 歯みがき', '📚 勉強'];
     const MINUTES = [2, 5, 10, 15];
+    const RESTS = [0, 5, 10, 15, 30];
     const CHEERS = ['始めた時点でもうえらい', 'とりあえず手を動かそう', '完璧じゃなくていい', 'ゆっくりでOK', 'いい感じ！', '少しずつ進んでる'];
+    const CHILLS = ['今はダラダラしてOK', '鳴ったら始めよう', '休むのも大事', '決めた時点でえらい'];
     const PARTY = ['🎉', '✨', '💪', '🌟', '👏'];
 
     let customTasks = JSON.parse(localStorage.getItem('pomo-custom-tasks') || '[]');
-    // phase: setup（選択）→ run（実行中）→ done（完了画面）
-    let quick = JSON.parse(localStorage.getItem('pomo-quick') || 'null') || {
-      task: DEFAULT_TASKS[0], minutes: 5, phase: 'setup', running: false, endAt: 0, remaining: 0, total: 0, early: false
+    // phase: setup（選択）→ wait（休憩中）→ run（作業中）→ done（完了画面）
+    let quick = {
+      task: DEFAULT_TASKS[0], minutes: 5, rest: 10, phase: 'setup', running: false,
+      endAt: 0, remaining: 0, total: 0, waitTotal: 0, early: false,
+      ...JSON.parse(localStorage.getItem('pomo-quick') || '{}')
     };
     const quickProgressEl = $('quickProgress');
+    const waitProgressEl = $('waitProgress');
     quickProgressEl.style.strokeDasharray = CIRC;
+    waitProgressEl.style.strokeDasharray = CIRC;
 
     const saveQuick = () => localStorage.setItem('pomo-quick', JSON.stringify(quick));
     const quickRemaining = () => quick.running ? Math.max(0, quick.endAt - Date.now()) : quick.remaining;
@@ -615,7 +647,29 @@
       renderQuickPanes();
     }
 
+    // 休憩カウントダウン。鳴ったら作業タイマーへ
+    function startWait() {
+      quick.phase = 'wait';
+      quick.waitTotal = quick.rest * 60000;
+      quick.running = true;
+      quick.endAt = Date.now() + quick.waitTotal;
+      saveQuick();
+      onTimerStart();
+      renderQuickPanes();
+      tick();
+    }
+
+    function startWork() {
+      quick.total = quick.minutes * 60000;
+      quickRun(quick.total);
+    }
+
     function quickTimeUp() {
+      if (quick.phase === 'wait') {
+        startWork();
+        alertUser(`${quick.task}の時間だよ！とりあえず${quick.minutes}分だけ。`);
+        return;
+      }
       quickStop(false);
       alertUser(`${quick.task} ${spentMinutes()}分がんばった！`);
     }
@@ -635,6 +689,14 @@
 
     // 1秒ごとに変わる部分
     function renderQuick() {
+      if (quick.phase === 'wait') {
+        const ms = quickRemaining();
+        $('waitTime').textContent = format(ms);
+        waitProgressEl.style.strokeDashoffset = CIRC * (1 - ms / quick.waitTotal);
+        $('waitCheer').textContent = ms < 60000 ? 'そろそろ準備しよう'
+          : CHILLS[Math.floor((quick.waitTotal - ms) / 20000) % CHILLS.length];
+        return;
+      }
       if (quick.phase !== 'run') return;
       const ms = quickRemaining();
       $('quickTime').textContent = format(ms);
@@ -648,10 +710,15 @@
 
     // 画面の切り替えや選択肢の表示
     function renderQuickPanes() {
+      document.body.dataset.quick = quick.phase;
       $('quickSetup').hidden = quick.phase !== 'setup';
+      $('quickWait').hidden = quick.phase !== 'wait';
       $('quickRun').hidden = quick.phase !== 'run';
       $('quickDone').hidden = quick.phase !== 'done';
       $('quickTask').textContent = quick.task;
+      $('waitTask').textContent = `${quick.task}まで`;
+      $('waitLabel').textContent = `鳴ったら${quick.minutes}分だけ`;
+      $('quickStart').textContent = quick.rest ? `${quick.rest}分休んだらやる` : '今すぐ始める';
 
       if (quick.phase === 'done') {
         const min = spentMinutes();
@@ -702,6 +769,16 @@
       });
       taskChips.appendChild(add);
 
+      const restChips = $('restChips');
+      restChips.innerHTML = '';
+      RESTS.forEach(m => {
+        const chip = document.createElement('button');
+        chip.className = 'chip' + (m === quick.rest ? ' selected' : '');
+        chip.textContent = m ? `${m}分` : '今すぐ';
+        chip.addEventListener('click', () => { quick.rest = m; saveQuick(); renderQuickPanes(); });
+        restChips.appendChild(chip);
+      });
+
       const minChips = $('minChips');
       minChips.innerHTML = '';
       MINUTES.forEach(m => {
@@ -727,9 +804,10 @@
       renderQuick();
     }
 
-    $('quickStart').addEventListener('click', () => {
-      quick.total = quick.minutes * 60000;
-      quickRun(quick.total);
+    $('quickStart').addEventListener('click', () => quick.rest ? startWait() : startWork());
+    $('waitNow').addEventListener('click', startWork);
+    $('waitCancel').addEventListener('click', () => {
+      if (confirm('休憩タイマーをやめる？')) quickClose(false);
     });
     $('quickPause').addEventListener('click', () => {
       if (quick.running) {
