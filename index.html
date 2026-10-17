@@ -592,7 +592,7 @@
     });
 
     // ---- やる気スイッチ ----
-    const MINUTES = [2, 5, 10, 15];
+    const MINUTES = [0, 2, 5, 10, 15];
     const RESTS = [0, 5, 10, 15, 30];
     const CHEERS = ['始めた時点でもうえらい', 'とりあえず手を動かそう', '完璧じゃなくていい', 'ゆっくりでOK', 'いい感じ！', '少しずつ進んでる'];
     const CHILLS = ['今はダラダラしてOK', '鳴ったら始めよう', '休むのも大事', '決めた時点でえらい'];
@@ -625,12 +625,14 @@
       tick();
     }
 
-    function quickStop(early) {
+    // signal: やる時間0分のとき。作業タイマーなしで「時間だよ」の合図だけ出す
+    function quickStop(early, signal = false) {
       quick.remaining = quickRemaining();
       quick.running = false;
       quick.phase = 'done';
       quick.early = early;
-      $('party').textContent = PARTY[Math.floor(Math.random() * PARTY.length)];
+      quick.signal = signal;
+      $('party').textContent = signal ? '⏰' : PARTY[Math.floor(Math.random() * PARTY.length)];
       saveQuick();
       syncWakeLock();
       renderQuickPanes();
@@ -650,13 +652,14 @@
 
     function startWork() {
       quick.total = quick.minutes * 60000;
-      quickRun(quick.total);
+      if (quick.minutes === 0) quickStop(false, true);
+      else quickRun(quick.total);
     }
 
     function quickTimeUp() {
       if (quick.phase === 'wait') {
         startWork();
-        alertUser(`時間だよ！とりあえず${quick.minutes}分だけやろう。`);
+        alertUser(quick.minutes ? `時間だよ！とりあえず${quick.minutes}分だけやろう。` : '時間だよ！さあ、動こう。');
         return;
       }
       quickStop(false);
@@ -666,7 +669,7 @@
     function quickClose(record) {
       if (record) {
         const log = getQuickLog();
-        log.push({ min: spentMinutes() });
+        log.push({ min: quick.signal ? 0 : spentMinutes() });
         localStorage.setItem(quickLogKey(), JSON.stringify(log));
       }
       quick.phase = 'setup';
@@ -704,17 +707,23 @@
       $('quickWait').hidden = quick.phase !== 'wait';
       $('quickRun').hidden = quick.phase !== 'run';
       $('quickDone').hidden = quick.phase !== 'done';
-      $('waitLabel').textContent = `鳴ったら${quick.minutes}分だけ`;
-      $('quickStart').textContent = quick.rest ? `${quick.rest}分休んだらやる` : '今すぐ始める';
+      $('waitLabel').textContent = quick.minutes ? `鳴ったら${quick.minutes}分だけ` : '鳴ったら合図';
+      // 休む時間もやる時間も0分だとタイマーの意味がないので押せなくする
+      const nothing = !quick.rest && !quick.minutes;
+      $('quickStart').disabled = nothing;
+      $('quickStart').style.opacity = nothing ? .4 : '';
+      $('quickStart').textContent = nothing ? 'どちらかの時間を選んでね'
+        : quick.rest ? `${quick.rest}分休んだらやる` : '今すぐ始める';
 
       if (quick.phase === 'done') {
         const min = spentMinutes();
-        $('doneTitle').textContent = quick.early ? 'おつかれさま！' : 'やったね！';
-        $('doneMsg').textContent = quick.early
-          ? `${min}分で終わらせた！`
+        $('doneTitle').textContent = quick.signal ? '時間だよ！' : quick.early ? 'おつかれさま！' : 'やったね！';
+        $('doneMsg').textContent = quick.signal ? 'さあ、動こう。'
+          : quick.early ? `${min}分で終わらせた！`
           : `${min}分がんばった。\nこのまま続ける？やめてもOK。`;
-        $('quickExtend').hidden = quick.early;
-        $('quickClose').textContent = quick.early ? 'とじる' : 'ここでおわり';
+        $('quickExtend').hidden = quick.early || quick.signal;
+        $('quickClose').textContent = quick.signal ? 'OK' : quick.early ? 'とじる' : 'ここでおわり';
+        $('quickClose').className = quick.signal ? 'big-start' : 'ghost-btn';
       }
 
       const restChips = $('restChips');
@@ -732,7 +741,7 @@
       MINUTES.forEach(m => {
         const chip = document.createElement('button');
         chip.className = 'chip' + (m === quick.minutes ? ' selected' : '');
-        chip.textContent = `${m}分`;
+        chip.textContent = m ? `${m}分` : '0分（合図だけ）';
         chip.addEventListener('click', () => { quick.minutes = m; saveQuick(); renderQuickPanes(); });
         minChips.appendChild(chip);
       });
@@ -740,7 +749,7 @@
       const log = getQuickLog();
       const total = log.reduce((sum, { min }) => sum + min, 0);
       $('quickLog').textContent = log.length
-        ? `今日やった回数：${log.length}回（合計${total}分）`
+        ? `今日やった回数：${log.length}回` + (total ? `（合計${total}分）` : '')
         : '今日はまだ。1回目いってみよう';
       renderQuick();
     }
