@@ -11,7 +11,11 @@
       "Bash(gh api *)",
       "Bash(git init *)",
       "Bash(git add *)",
-      "Bash(git commit -q -m 'ポモドーロタイマーを追加 *)"
+      "Bash(git commit -q -m 'ポモドーロタイマーを追加 *)",
+      "Read(//Applications/**)",
+      "Bash(python3 -c \"import playwright; print\\('playwright ok'\\)\")",
+      "Bash(python3 -)",
+      "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless=new --disable-gpu --user-data-dir=/tmp/pomochrome --window-size=390,844 --virtual-time-budget=2000 --dump-dom \"http://localhost:8765/w.html?stage=setup\")"
     ]
   }
 }

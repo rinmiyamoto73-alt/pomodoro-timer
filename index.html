@@ -83,7 +83,7 @@
       position: absolute; inset: 0;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
     }
-    #time {
+    #time, #quickTime {
       font-size: clamp(56px, 18vw, 76px); font-weight: 300;
       font-variant-numeric: tabular-nums; letter-spacing: 1px;
     }
@@ -153,16 +153,86 @@
       width: 100%; margin-top: 16px; padding: 14px; border: none; border-radius: 12px;
       background: var(--accent); color: #fff; font-size: 16px; font-weight: 600; cursor: pointer;
     }
+
+    /* 画面切り替え */
+    body[data-view="quick"] { --accent: #ffa94d; }
+    .view-switch {
+      display: flex; background: var(--surface); padding: 4px; border-radius: 12px;
+    }
+    .view-switch button {
+      border: none; background: none; color: var(--muted);
+      font-size: 15px; padding: 8px 14px; border-radius: 9px; cursor: pointer;
+    }
+    .view-switch button.active { background: var(--track); color: var(--text); font-weight: 600; }
+    .view {
+      flex: 1; width: 100%; max-width: 420px;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    [hidden] { display: none !important; }
+
+    /* やる気スイッチ */
+    .quick-pane {
+      flex: 1; width: 100%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px;
+    }
+    #quickSetup { justify-content: flex-start; padding-top: 24px; gap: 14px; }
+    .lead { margin: 0 0 8px; font-size: 17px; font-weight: 600; text-align: center; line-height: 1.6; }
+    .lead small { display: block; color: var(--muted); font-size: 13px; font-weight: 400; }
+    .q-title { align-self: flex-start; margin: 8px 0 0; font-size: 14px; color: var(--muted); font-weight: 500; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+    .chip {
+      position: relative; border: 2px solid transparent; background: var(--surface); color: var(--text);
+      font-size: 15px; padding: 10px 14px; border-radius: 999px; cursor: pointer;
+    }
+    .chip.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, var(--surface)); }
+    .chip.add { color: var(--muted); border: 2px dashed var(--track); background: none; }
+    .chip .del {
+      position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%;
+      background: var(--track); color: var(--muted); font-size: 12px; line-height: 20px; text-align: center;
+    }
+    .big-start {
+      width: 100%; margin-top: 12px; padding: 20px; border: none; border-radius: 18px;
+      background: var(--accent); color: #fff; font-size: 20px; font-weight: 700; cursor: pointer;
+      box-shadow: 0 6px 20px rgba(0,0,0,.35);
+    }
+    .big-start:active { transform: scale(.97); }
+    .log { width: 100%; margin-top: 8px; color: var(--muted); font-size: 14px; }
+    .log ul { list-style: none; padding: 0; margin: 6px 0 0; display: flex; flex-wrap: wrap; gap: 6px; }
+    .log li { background: var(--surface); padding: 4px 10px; border-radius: 8px; color: var(--text); font-size: 13px; }
+
+    .task-name { font-size: 22px; font-weight: 600; }
+    .cheer { min-height: 1.6em; font-size: 17px; text-align: center; color: var(--text); transition: opacity .3s; }
+    .done-btn {
+      height: 88px; padding: 0 28px; border-radius: 44px; border: none;
+      background: var(--accent); color: #fff; font-size: 18px; font-weight: 700; cursor: pointer;
+      box-shadow: 0 6px 20px rgba(0,0,0,.35);
+    }
+    .done-btn:active { transform: scale(.95); }
+
+    #quickDone { text-align: center; }
+    .party { font-size: 88px; animation: pop .6s ease; }
+    @keyframes pop { 0% { transform: scale(0) rotate(-30deg); } 70% { transform: scale(1.2); } 100% { transform: scale(1); } }
+    #quickDone h2 { margin: 0; font-size: 28px; }
+    #doneMsg { margin: 0; color: var(--muted); font-size: 16px; line-height: 1.7; white-space: pre-line; }
+    .done-actions { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+    .ghost-btn {
+      width: 100%; padding: 16px; border: none; border-radius: 14px;
+      background: var(--surface); color: var(--text); font-size: 16px; cursor: pointer;
+    }
   </style>
 </head>
 <body data-mode="work">
   <header>
-    <h1>ポモドーロ</h1>
+    <div class="view-switch">
+      <button data-view="pomo">ポモドーロ</button>
+      <button data-view="quick">やる気スイッチ</button>
+    </div>
     <button class="icon-btn" id="settingsBtn" aria-label="設定">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </button>
   </header>
 
+  <section class="view" id="pomoView">
   <div class="tabs" role="tablist">
     <button data-mode="work" class="active">集中</button>
     <button data-mode="short">小休憩</button>
@@ -197,6 +267,56 @@
     <div class="dots" id="dots"></div>
     <div id="today">今日の完了: 0 ポモドーロ</div>
   </main>
+  </section>
+
+  <section class="view" id="quickView" hidden>
+    <!-- 選択画面 -->
+    <div class="quick-pane" id="quickSetup">
+      <p class="lead">しんどい時は「ちょっとだけ」でOK<small>タイマーが鳴ったらやめていい。始めたらもう勝ち。</small></p>
+      <p class="q-title">なにする？</p>
+      <div class="chips" id="taskChips"></div>
+      <p class="q-title">どれくらい？</p>
+      <div class="chips" id="minChips"></div>
+      <button class="big-start" id="quickStart">とりあえず始める</button>
+      <div class="log" id="quickLog"></div>
+    </div>
+
+    <!-- 実行中 -->
+    <div class="quick-pane" id="quickRun" hidden>
+      <div class="task-name" id="quickTask"></div>
+      <div class="ring">
+        <svg viewBox="0 0 220 220">
+          <circle class="track" cx="110" cy="110" r="100"/>
+          <circle class="progress" id="quickProgress" cx="110" cy="110" r="100"/>
+        </svg>
+        <div class="center">
+          <div id="quickTime">05:00</div>
+        </div>
+      </div>
+      <div class="cheer" id="cheer"></div>
+      <div class="controls">
+        <button class="sub-btn" id="quickQuit" aria-label="やめる">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <button class="done-btn" id="quickFinish">終わった！</button>
+        <button class="sub-btn" id="quickPause" aria-label="一時停止">
+          <svg id="qPauseIcon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+          <svg id="qPlayIcon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- 完了画面 -->
+    <div class="quick-pane" id="quickDone" hidden>
+      <div class="party" id="party">🎉</div>
+      <h2 id="doneTitle">やったね！</h2>
+      <p id="doneMsg"></p>
+      <div class="done-actions">
+        <button class="big-start" id="quickExtend">もう5分だけ</button>
+        <button class="ghost-btn" id="quickClose">ここでおわり</button>
+      </div>
+    </div>
+  </section>
 
   <div class="sheet-backdrop" id="backdrop"></div>
   <div class="sheet" id="sheet" role="dialog" aria-label="設定">
@@ -235,7 +355,6 @@
     const progressEl = $('progress');
     progressEl.style.strokeDasharray = CIRC;
 
-    let timerId = null;
     let audioCtx = null;
     let wakeLock = null;
 
@@ -263,7 +382,6 @@
       const t = format(ms);
       $('time').textContent = t;
       $('label').textContent = LABELS[state.mode];
-      document.title = state.running ? `${t} - ${state.mode === 'work' ? '集中' : '休憩'}` : 'ポモドーロタイマー';
       progressEl.style.strokeDashoffset = CIRC * (1 - ms / duration(state.mode));
 
       document.body.dataset.mode = state.mode;
@@ -281,20 +399,28 @@
       $('today').textContent = `今日の完了: ${getToday()} ポモドーロ`;
     }
 
+    // ポモドーロとやる気スイッチの両方をここで進める
     function tick() {
       if (state.running && remainingMs() <= 0) finish();
+      if (quick.running && quickRemaining() <= 0) quickTimeUp();
       render();
+      renderQuick();
+      const t = state.running ? `${format(remainingMs())} - ${state.mode === 'work' ? '集中' : '休憩'}`
+              : quick.running ? `${format(quickRemaining())} - ${quick.task}` : null;
+      document.title = t || 'ポモドーロタイマー';
+    }
+
+    function onTimerStart() {
+      unlockAudio();
+      syncWakeLock();
+      if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
     }
 
     function start() {
-      unlockAudio();
       state.running = true;
       state.endAt = Date.now() + state.remaining;
       saveState();
-      clearInterval(timerId);
-      timerId = setInterval(tick, 250);
-      requestWakeLock();
-      if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+      onTimerStart();
       render();
     }
 
@@ -302,8 +428,7 @@
       state.remaining = remainingMs();
       state.running = false;
       saveState();
-      clearInterval(timerId);
-      releaseWakeLock();
+      syncWakeLock();
       render();
     }
 
@@ -311,9 +436,8 @@
       state.mode = mode;
       state.remaining = duration(mode);
       state.running = false;
-      clearInterval(timerId);
       saveState();
-      if (keepRunning) start(); else { releaseWakeLock(); render(); }
+      if (keepRunning) start(); else { syncWakeLock(); render(); }
     }
 
     function nextMode() {
@@ -328,7 +452,7 @@
     function finish() {
       const wasWork = state.mode === 'work';
       if (wasWork) localStorage.setItem(todayKey(), getToday() + 1);
-      alertUser(wasWork);
+      alertUser(wasWork ? 'お疲れさま！休憩しましょう。' : '休憩終了。集中モードに戻りましょう。');
       switchMode(nextMode(), settings.autoStart);
     }
 
@@ -367,10 +491,9 @@
       });
     }
 
-    function alertUser(wasWork) {
+    function alertUser(body) {
       beep();
       if (settings.vibrate && navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
-      const body = wasWork ? 'お疲れさま！休憩しましょう。' : '休憩終了。集中モードに戻りましょう。';
       if ('Notification' in window && Notification.permission === 'granted' && document.visibilityState !== 'visible') {
         navigator.serviceWorker?.ready
           .then(reg => reg.showNotification('ポモドーロタイマー', { body, icon: 'icon-192.png', tag: 'pomo' }))
@@ -390,12 +513,14 @@
       wakeLock?.release();
       wakeLock = null;
     }
+    // どちらかのタイマーが動いている間だけスリープを防ぐ
+    const syncWakeLock = () => (state.running || quick.running) ? requestWakeLock() : releaseWakeLock();
 
     // バックグラウンドから戻ったら時間を再計算し、Wake Lock を取り直す
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         tick();
-        if (state.running) requestWakeLock();
+        syncWakeLock();
       }
     });
 
@@ -445,17 +570,205 @@
         settings[key] = input.checked;
         saveSettings();
         if (key === 'sound' && input.checked) { unlockAudio(); beep(); }
-        if (key === 'wakeLock') input.checked && state.running ? requestWakeLock() : releaseWakeLock();
+        if (key === 'wakeLock') syncWakeLock();
       });
     });
 
-    // ---- 起動 ----
-    if (state.running) {
-      timerId = setInterval(tick, 250);
+    // ---- やる気スイッチ ----
+    const DEFAULT_TASKS = ['🍽 皿洗い', '🛁 お風呂', '👕 洗濯', '🧹 片付け', '🪥 歯みがき', '📚 勉強'];
+    const MINUTES = [2, 5, 10, 15];
+    const CHEERS = ['始めた時点でもうえらい', 'とりあえず手を動かそう', '完璧じゃなくていい', 'ゆっくりでOK', 'いい感じ！', '少しずつ進んでる'];
+    const PARTY = ['🎉', '✨', '💪', '🌟', '👏'];
+
+    let customTasks = JSON.parse(localStorage.getItem('pomo-custom-tasks') || '[]');
+    // phase: setup（選択）→ run（実行中）→ done（完了画面）
+    let quick = JSON.parse(localStorage.getItem('pomo-quick') || 'null') || {
+      task: DEFAULT_TASKS[0], minutes: 5, phase: 'setup', running: false, endAt: 0, remaining: 0, total: 0, early: false
+    };
+    const quickProgressEl = $('quickProgress');
+    quickProgressEl.style.strokeDasharray = CIRC;
+
+    const saveQuick = () => localStorage.setItem('pomo-quick', JSON.stringify(quick));
+    const quickRemaining = () => quick.running ? Math.max(0, quick.endAt - Date.now()) : quick.remaining;
+    const spentMinutes = () => Math.max(1, Math.round((quick.total - quickRemaining()) / 60000));
+    const quickLogKey = () => todayKey().replace('count', 'quick');
+    const getQuickLog = () => JSON.parse(localStorage.getItem(quickLogKey()) || '[]');
+
+    function quickRun(ms) {
+      quick.phase = 'run';
+      quick.running = true;
+      quick.endAt = Date.now() + ms;
+      saveQuick();
+      onTimerStart();
+      renderQuickPanes();
       tick();
-    } else {
-      render();
     }
+
+    function quickStop(early) {
+      quick.remaining = quickRemaining();
+      quick.running = false;
+      quick.phase = 'done';
+      quick.early = early;
+      $('party').textContent = PARTY[Math.floor(Math.random() * PARTY.length)];
+      saveQuick();
+      syncWakeLock();
+      renderQuickPanes();
+    }
+
+    function quickTimeUp() {
+      quickStop(false);
+      alertUser(`${quick.task} ${spentMinutes()}分がんばった！`);
+    }
+
+    function quickClose(record) {
+      if (record) {
+        const log = getQuickLog();
+        log.push({ task: quick.task, min: spentMinutes() });
+        localStorage.setItem(quickLogKey(), JSON.stringify(log));
+      }
+      quick.phase = 'setup';
+      quick.running = false;
+      saveQuick();
+      syncWakeLock();
+      renderQuickPanes();
+    }
+
+    // 1秒ごとに変わる部分
+    function renderQuick() {
+      if (quick.phase !== 'run') return;
+      const ms = quickRemaining();
+      $('quickTime').textContent = format(ms);
+      quickProgressEl.style.strokeDashoffset = CIRC * (1 - ms / quick.total);
+      $('cheer').textContent = !quick.running ? '一時停止中'
+        : ms < 60000 ? 'あと少し！'
+        : CHEERS[Math.floor((quick.total - ms) / 20000) % CHEERS.length];
+      $('qPauseIcon').style.display = quick.running ? '' : 'none';
+      $('qPlayIcon').style.display = quick.running ? 'none' : '';
+    }
+
+    // 画面の切り替えや選択肢の表示
+    function renderQuickPanes() {
+      $('quickSetup').hidden = quick.phase !== 'setup';
+      $('quickRun').hidden = quick.phase !== 'run';
+      $('quickDone').hidden = quick.phase !== 'done';
+      $('quickTask').textContent = quick.task;
+
+      if (quick.phase === 'done') {
+        const min = spentMinutes();
+        $('doneTitle').textContent = quick.early ? 'おつかれさま！' : 'やったね！';
+        $('doneMsg').textContent = quick.early
+          ? `${quick.task}\n${min}分で終わらせた！`
+          : `${quick.task}を${min}分がんばった。\nこのまま続ける？やめてもOK。`;
+        $('quickExtend').hidden = quick.early;
+        $('quickClose').textContent = quick.early ? 'とじる' : 'ここでおわり';
+      }
+
+      const taskChips = $('taskChips');
+      taskChips.innerHTML = '';
+      [...DEFAULT_TASKS, ...customTasks].forEach(task => {
+        const chip = document.createElement('button');
+        chip.className = 'chip' + (task === quick.task ? ' selected' : '');
+        chip.textContent = task;
+        chip.addEventListener('click', () => { quick.task = task; saveQuick(); renderQuickPanes(); });
+        if (customTasks.includes(task)) {
+          const del = document.createElement('span');
+          del.className = 'del';
+          del.textContent = '×';
+          del.addEventListener('click', e => {
+            e.stopPropagation();
+            customTasks = customTasks.filter(t => t !== task);
+            localStorage.setItem('pomo-custom-tasks', JSON.stringify(customTasks));
+            if (quick.task === task) quick.task = DEFAULT_TASKS[0];
+            saveQuick();
+            renderQuickPanes();
+          });
+          chip.appendChild(del);
+        }
+        taskChips.appendChild(chip);
+      });
+      const add = document.createElement('button');
+      add.className = 'chip add';
+      add.textContent = '＋ 追加';
+      add.addEventListener('click', () => {
+        const name = (prompt('やることを入力してください') || '').trim();
+        if (!name) return;
+        if (![...DEFAULT_TASKS, ...customTasks].includes(name)) {
+          customTasks.push(name);
+          localStorage.setItem('pomo-custom-tasks', JSON.stringify(customTasks));
+        }
+        quick.task = name;
+        saveQuick();
+        renderQuickPanes();
+      });
+      taskChips.appendChild(add);
+
+      const minChips = $('minChips');
+      minChips.innerHTML = '';
+      MINUTES.forEach(m => {
+        const chip = document.createElement('button');
+        chip.className = 'chip' + (m === quick.minutes ? ' selected' : '');
+        chip.textContent = `${m}分`;
+        chip.addEventListener('click', () => { quick.minutes = m; saveQuick(); renderQuickPanes(); });
+        minChips.appendChild(chip);
+      });
+
+      const log = getQuickLog();
+      const logEl = $('quickLog');
+      logEl.textContent = log.length ? `今日やったこと（${log.length}個）` : '今日やったこと：まだなし。ひとつ目いってみよう';
+      if (log.length) {
+        const ul = document.createElement('ul');
+        log.forEach(({ task, min }) => {
+          const li = document.createElement('li');
+          li.textContent = `${task} ${min}分`;
+          ul.appendChild(li);
+        });
+        logEl.appendChild(ul);
+      }
+      renderQuick();
+    }
+
+    $('quickStart').addEventListener('click', () => {
+      quick.total = quick.minutes * 60000;
+      quickRun(quick.total);
+    });
+    $('quickPause').addEventListener('click', () => {
+      if (quick.running) {
+        quick.remaining = quickRemaining();
+        quick.running = false;
+        saveQuick();
+        syncWakeLock();
+        renderQuick();
+      } else {
+        quickRun(quick.remaining);
+      }
+    });
+    $('quickFinish').addEventListener('click', () => quickStop(true));
+    $('quickQuit').addEventListener('click', () => {
+      if (confirm('ここでやめる？（記録はされません）')) quickClose(false);
+    });
+    $('quickExtend').addEventListener('click', () => {
+      quick.total += 5 * 60000;
+      quickRun(quick.remaining + 5 * 60000);
+    });
+    $('quickClose').addEventListener('click', () => quickClose(true));
+
+    // ---- 画面切り替え ----
+    function setView(v) {
+      localStorage.setItem('pomo-view', v);
+      document.body.dataset.view = v;
+      $('pomoView').hidden = v !== 'pomo';
+      $('quickView').hidden = v !== 'quick';
+      document.querySelectorAll('.view-switch button').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+    }
+    document.querySelectorAll('.view-switch button').forEach(b =>
+      b.addEventListener('click', () => setView(b.dataset.view))
+    );
+
+    // ---- 起動 ----
+    setView(localStorage.getItem('pomo-view') || 'pomo');
+    renderQuickPanes();
+    tick();
+    setInterval(tick, 250);
 
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   </script>
