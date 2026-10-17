@@ -187,20 +187,13 @@
       font-size: 15px; padding: 10px 14px; border-radius: 999px; cursor: pointer;
     }
     .chip.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, var(--surface)); }
-    .chip.add { color: var(--muted); border: 2px dashed var(--track); background: none; }
-    .chip .del {
-      position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%;
-      background: var(--track); color: var(--muted); font-size: 12px; line-height: 20px; text-align: center;
-    }
     .big-start {
       width: 100%; margin-top: 12px; padding: 20px; border: none; border-radius: 18px;
       background: var(--accent); color: #fff; font-size: 20px; font-weight: 700; cursor: pointer;
       box-shadow: 0 6px 20px rgba(0,0,0,.35);
     }
     .big-start:active { transform: scale(.97); }
-    .log { width: 100%; margin-top: 8px; color: var(--muted); font-size: 14px; }
-    .log ul { list-style: none; padding: 0; margin: 6px 0 0; display: flex; flex-wrap: wrap; gap: 6px; }
-    .log li { background: var(--surface); padding: 4px 10px; border-radius: 8px; color: var(--text); font-size: 13px; }
+    .log { width: 100%; margin-top: 8px; color: var(--muted); font-size: 14px; text-align: center; }
 
     .task-name { font-size: 22px; font-weight: 600; }
     .cheer { min-height: 1.6em; font-size: 17px; text-align: center; color: var(--text); transition: opacity .3s; }
@@ -275,8 +268,6 @@
     <!-- 選択画面 -->
     <div class="quick-pane" id="quickSetup">
       <p class="lead">「あと◯分休んだらやる」って決めよう<small>それまではダラダラしてOK。鳴ったら合図。</small></p>
-      <p class="q-title">なにする？</p>
-      <div class="chips" id="taskChips"></div>
       <p class="q-title">あと何分休む？</p>
       <div class="chips" id="restChips"></div>
       <p class="q-title">やる時間は？（ちょっとだけでOK）</p>
@@ -287,7 +278,7 @@
 
     <!-- 休憩中（鳴るまで待つ） -->
     <div class="quick-pane" id="quickWait" hidden>
-      <div class="task-name" id="waitTask"></div>
+      <div class="task-name">鳴ったらやる</div>
       <div class="ring">
         <svg viewBox="0 0 220 220">
           <circle class="track" cx="110" cy="110" r="100"/>
@@ -309,7 +300,7 @@
 
     <!-- 実行中 -->
     <div class="quick-pane" id="quickRun" hidden>
-      <div class="task-name" id="quickTask"></div>
+      <div class="task-name">やる時間！</div>
       <div class="ring">
         <svg viewBox="0 0 220 220">
           <circle class="track" cx="110" cy="110" r="100"/>
@@ -432,7 +423,7 @@
       render();
       renderQuick();
       const t = state.running ? `${format(remainingMs())} - ${state.mode === 'work' ? '集中' : '休憩'}`
-              : quick.running ? `${format(quickRemaining())} - ${quick.task}` : null;
+              : quick.running ? `${format(quickRemaining())} - ${quick.phase === 'wait' ? '休憩中' : 'やる時間'}` : null;
       document.title = t || 'ポモドーロタイマー';
     }
 
@@ -601,17 +592,15 @@
     });
 
     // ---- やる気スイッチ ----
-    const DEFAULT_TASKS = ['🍽 皿洗い', '🛁 お風呂', '👕 洗濯', '🧹 片付け', '🪥 歯みがき', '📚 勉強'];
     const MINUTES = [2, 5, 10, 15];
     const RESTS = [0, 5, 10, 15, 30];
     const CHEERS = ['始めた時点でもうえらい', 'とりあえず手を動かそう', '完璧じゃなくていい', 'ゆっくりでOK', 'いい感じ！', '少しずつ進んでる'];
     const CHILLS = ['今はダラダラしてOK', '鳴ったら始めよう', '休むのも大事', '決めた時点でえらい'];
     const PARTY = ['🎉', '✨', '💪', '🌟', '👏'];
 
-    let customTasks = JSON.parse(localStorage.getItem('pomo-custom-tasks') || '[]');
     // phase: setup（選択）→ wait（休憩中）→ run（作業中）→ done（完了画面）
     let quick = {
-      task: DEFAULT_TASKS[0], minutes: 5, rest: 10, phase: 'setup', running: false,
+      minutes: 5, rest: 10, phase: 'setup', running: false,
       endAt: 0, remaining: 0, total: 0, waitTotal: 0, early: false,
       ...JSON.parse(localStorage.getItem('pomo-quick') || '{}')
     };
@@ -667,17 +656,17 @@
     function quickTimeUp() {
       if (quick.phase === 'wait') {
         startWork();
-        alertUser(`${quick.task}の時間だよ！とりあえず${quick.minutes}分だけ。`);
+        alertUser(`時間だよ！とりあえず${quick.minutes}分だけやろう。`);
         return;
       }
       quickStop(false);
-      alertUser(`${quick.task} ${spentMinutes()}分がんばった！`);
+      alertUser(`${spentMinutes()}分がんばった！`);
     }
 
     function quickClose(record) {
       if (record) {
         const log = getQuickLog();
-        log.push({ task: quick.task, min: spentMinutes() });
+        log.push({ min: spentMinutes() });
         localStorage.setItem(quickLogKey(), JSON.stringify(log));
       }
       quick.phase = 'setup';
@@ -715,8 +704,6 @@
       $('quickWait').hidden = quick.phase !== 'wait';
       $('quickRun').hidden = quick.phase !== 'run';
       $('quickDone').hidden = quick.phase !== 'done';
-      $('quickTask').textContent = quick.task;
-      $('waitTask').textContent = `${quick.task}まで`;
       $('waitLabel').textContent = `鳴ったら${quick.minutes}分だけ`;
       $('quickStart').textContent = quick.rest ? `${quick.rest}分休んだらやる` : '今すぐ始める';
 
@@ -724,50 +711,11 @@
         const min = spentMinutes();
         $('doneTitle').textContent = quick.early ? 'おつかれさま！' : 'やったね！';
         $('doneMsg').textContent = quick.early
-          ? `${quick.task}\n${min}分で終わらせた！`
-          : `${quick.task}を${min}分がんばった。\nこのまま続ける？やめてもOK。`;
+          ? `${min}分で終わらせた！`
+          : `${min}分がんばった。\nこのまま続ける？やめてもOK。`;
         $('quickExtend').hidden = quick.early;
         $('quickClose').textContent = quick.early ? 'とじる' : 'ここでおわり';
       }
-
-      const taskChips = $('taskChips');
-      taskChips.innerHTML = '';
-      [...DEFAULT_TASKS, ...customTasks].forEach(task => {
-        const chip = document.createElement('button');
-        chip.className = 'chip' + (task === quick.task ? ' selected' : '');
-        chip.textContent = task;
-        chip.addEventListener('click', () => { quick.task = task; saveQuick(); renderQuickPanes(); });
-        if (customTasks.includes(task)) {
-          const del = document.createElement('span');
-          del.className = 'del';
-          del.textContent = '×';
-          del.addEventListener('click', e => {
-            e.stopPropagation();
-            customTasks = customTasks.filter(t => t !== task);
-            localStorage.setItem('pomo-custom-tasks', JSON.stringify(customTasks));
-            if (quick.task === task) quick.task = DEFAULT_TASKS[0];
-            saveQuick();
-            renderQuickPanes();
-          });
-          chip.appendChild(del);
-        }
-        taskChips.appendChild(chip);
-      });
-      const add = document.createElement('button');
-      add.className = 'chip add';
-      add.textContent = '＋ 追加';
-      add.addEventListener('click', () => {
-        const name = (prompt('やることを入力してください') || '').trim();
-        if (!name) return;
-        if (![...DEFAULT_TASKS, ...customTasks].includes(name)) {
-          customTasks.push(name);
-          localStorage.setItem('pomo-custom-tasks', JSON.stringify(customTasks));
-        }
-        quick.task = name;
-        saveQuick();
-        renderQuickPanes();
-      });
-      taskChips.appendChild(add);
 
       const restChips = $('restChips');
       restChips.innerHTML = '';
@@ -790,17 +738,10 @@
       });
 
       const log = getQuickLog();
-      const logEl = $('quickLog');
-      logEl.textContent = log.length ? `今日やったこと（${log.length}個）` : '今日やったこと：まだなし。ひとつ目いってみよう';
-      if (log.length) {
-        const ul = document.createElement('ul');
-        log.forEach(({ task, min }) => {
-          const li = document.createElement('li');
-          li.textContent = `${task} ${min}分`;
-          ul.appendChild(li);
-        });
-        logEl.appendChild(ul);
-      }
+      const total = log.reduce((sum, { min }) => sum + min, 0);
+      $('quickLog').textContent = log.length
+        ? `今日やった回数：${log.length}回（合計${total}分）`
+        : '今日はまだ。1回目いってみよう';
       renderQuick();
     }
 
