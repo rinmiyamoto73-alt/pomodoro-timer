@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#1b1d22">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ポモドーロ">
+  <title>ポモドーロタイマー</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <style>
+    :root {
+      --bg: #1b1d22;
+      --surface: #262930;
+      --text: #f2f2f2;
+      --muted: #9097a3;
+      --accent: #ff6b5b;
+      --track: #33373f;
+    }
+    body[data-mode="short"] { --accent: #4cc38a; }
+    body[data-mode="long"]  { --accent: #5aa9ff; }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: calc(env(safe-area-inset-top) + 16px) 20px calc(env(safe-area-inset-bottom) + 20px);
+      user-select: none;
+      -webkit-user-select: none;
+      overscroll-behavior: none;
+      transition: background-color .4s;
+    }
+
+    header {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 { font-size: 18px; font-weight: 600; margin: 0; }
+    .icon-btn {
+      background: none; border: none; color: var(--muted);
+      width: 44px; height: 44px; border-radius: 50%;
+      display: grid; place-items: center; cursor: pointer;
+    }
+    .icon-btn:active { background: var(--surface); }
+
+    .tabs {
+      display: flex; gap: 6px; margin-top: 20px;
+      background: var(--surface); padding: 4px; border-radius: 999px;
+    }
+    .tabs button {
+      border: none; background: none; color: var(--muted);
+      font-size: 14px; padding: 8px 14px; border-radius: 999px; cursor: pointer;
+    }
+    .tabs button.active { background: var(--accent); color: #fff; font-weight: 600; }
+
+    main {
+      flex: 1; width: 100%; max-width: 420px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 32px;
+    }
+
+    .ring { position: relative; width: min(78vw, 320px); aspect-ratio: 1; }
+    .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .ring circle { fill: none; stroke-width: 10; }
+    .ring .track { stroke: var(--track); }
+    .ring .progress {
+      stroke: var(--accent); stroke-linecap: round;
+      transition: stroke-dashoffset .3s linear, stroke .4s;
+    }
+    .ring .center {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+    #time {
+      font-size: clamp(56px, 18vw, 76px); font-weight: 300;
+      font-variant-numeric: tabular-nums; letter-spacing: 1px;
+    }
+    #label { color: var(--muted); font-size: 15px; margin-top: 4px; }
+
+    .controls { display: flex; align-items: center; gap: 28px; }
+    .main-btn {
+      width: 88px; height: 88px; border-radius: 50%; border: none;
+      background: var(--accent); color: #fff; cursor: pointer;
+      display: grid; place-items: center;
+      box-shadow: 0 6px 20px rgba(0,0,0,.35);
+      transition: transform .1s, background-color .4s;
+    }
+    .main-btn:active { transform: scale(.94); }
+    .sub-btn {
+      width: 56px; height: 56px; border-radius: 50%; border: none;
+      background: var(--surface); color: var(--text); cursor: pointer;
+      display: grid; place-items: center;
+    }
+    .sub-btn:active { transform: scale(.94); }
+
+    .dots { display: flex; gap: 10px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--track); }
+    .dot.done { background: var(--accent); }
+
+    #today { color: var(--muted); font-size: 14px; }
+
+    /* 設定シート */
+    .sheet-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,.5);
+      opacity: 0; pointer-events: none; transition: opacity .25s;
+    }
+    .sheet-backdrop.open { opacity: 1; pointer-events: auto; }
+    .sheet {
+      position: fixed; left: 0; right: 0; bottom: 0;
+      max-width: 480px; margin: 0 auto;
+      background: var(--surface); border-radius: 20px 20px 0 0;
+      padding: 20px 20px calc(env(safe-area-inset-bottom) + 20px);
+      transform: translateY(100%); transition: transform .3s ease;
+      max-height: 85vh; overflow-y: auto;
+    }
+    .sheet.open { transform: translateY(0); }
+    .sheet h2 { font-size: 17px; margin: 0 0 12px; text-align: center; }
+    .row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 0; border-bottom: 1px solid var(--track); font-size: 15px;
+    }
+    .row:last-of-type { border-bottom: none; }
+    .stepper { display: flex; align-items: center; gap: 12px; }
+    .stepper button {
+      width: 36px; height: 36px; border-radius: 50%; border: none;
+      background: var(--track); color: var(--text); font-size: 20px; cursor: pointer;
+    }
+    .stepper span { min-width: 48px; text-align: center; font-variant-numeric: tabular-nums; }
+    .switch { position: relative; width: 50px; height: 30px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .slider {
+      position: absolute; inset: 0; background: var(--track); border-radius: 999px; transition: .2s;
+    }
+    .switch .slider::before {
+      content: ""; position: absolute; width: 24px; height: 24px; left: 3px; top: 3px;
+      background: #fff; border-radius: 50%; transition: .2s;
+    }
+    .switch input:checked + .slider { background: var(--accent); }
+    .switch input:checked + .slider::before { transform: translateX(20px); }
+    .close-btn {
+      width: 100%; margin-top: 16px; padding: 14px; border: none; border-radius: 12px;
+      background: var(--accent); color: #fff; font-size: 16px; font-weight: 600; cursor: pointer;
+    }
+  </style>
+</head>
+<body data-mode="work">
+  <header>
+    <h1>ポモドーロ</h1>
+    <button class="icon-btn" id="settingsBtn" aria-label="設定">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button data-mode="work" class="active">集中</button>
+    <button data-mode="short">小休憩</button>
+    <button data-mode="long">長休憩</button>
+  </div>
+
+  <main>
+    <div class="ring">
+      <svg viewBox="0 0 220 220">
+        <circle class="track" cx="110" cy="110" r="100"/>
+        <circle class="progress" id="progress" cx="110" cy="110" r="100"/>
+      </svg>
+      <div class="center">
+        <div id="time">25:00</div>
+        <div id="label">集中しよう</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="sub-btn" id="resetBtn" aria-label="リセット">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 3 3 9 9 9"/></svg>
+      </button>
+      <button class="main-btn" id="startBtn" aria-label="スタート">
+        <svg id="playIcon" width="36" height="36" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        <svg id="pauseIcon" width="36" height="36" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+      </button>
+      <button class="sub-btn" id="skipBtn" aria-label="スキップ">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M5 5v14l9-7zM16 5h3v14h-3z"/></svg>
+      </button>
+    </div>
+
+    <div class="dots" id="dots"></div>
+    <div id="today">今日の完了: 0 ポモドーロ</div>
+  </main>
+
+  <div class="sheet-backdrop" id="backdrop"></div>
+  <div class="sheet" id="sheet" role="dialog" aria-label="設定">
+    <h2>設定</h2>
+    <div class="row"><span>集中（分）</span>
+      <div class="stepper" data-key="work" data-min="1" data-max="90"><button>−</button><span></span><button>＋</button></div></div>
+    <div class="row"><span>小休憩（分）</span>
+      <div class="stepper" data-key="short" data-min="1" data-max="30"><button>−</button><span></span><button>＋</button></div></div>
+    <div class="row"><span>長休憩（分）</span>
+      <div class="stepper" data-key="long" data-min="1" data-max="60"><button>−</button><span></span><button>＋</button></div></div>
+    <div class="row"><span>長休憩までの回数</span>
+      <div class="stepper" data-key="interval" data-min="2" data-max="8"><button>−</button><span></span><button>＋</button></div></div>
+    <div class="row"><span>次のタイマーを自動開始</span>
+      <label class="switch"><input type="checkbox" data-key="autoStart"><span class="slider"></span></label></div>
+    <div class="row"><span>終了音</span>
+      <label class="switch"><input type="checkbox" data-key="sound"><span class="slider"></span></label></div>
+    <div class="row"><span>バイブレーション</span>
+      <label class="switch"><input type="checkbox" data-key="vibrate"><span class="slider"></span></label></div>
+    <div class="row"><span>画面をスリープさせない</span>
+      <label class="switch"><input type="checkbox" data-key="wakeLock"><span class="slider"></span></label></div>
+    <button class="close-btn" id="closeSheet">閉じる</button>
+  </div>
+
+  <script>
+    const DEFAULTS = { work: 25, short: 5, long: 15, interval: 4, autoStart: false, sound: true, vibrate: true, wakeLock: true };
+    const LABELS = { work: '集中しよう', short: 'ひと休み', long: 'しっかり休憩' };
+    const CIRC = 2 * Math.PI * 100;
+
+    const settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem('pomo-settings') || '{}') };
+    // 実行状態（リロードしても復元する）
+    let state = JSON.parse(localStorage.getItem('pomo-state') || 'null') || {
+      mode: 'work', running: false, endAt: 0, remaining: settings.work * 60 * 1000, cycle: 0
+    };
+
+    const $ = id => document.getElementById(id);
+    const progressEl = $('progress');
+    progressEl.style.strokeDasharray = CIRC;
+
+    let timerId = null;
+    let audioCtx = null;
+    let wakeLock = null;
+
+    const duration = mode => settings[mode] * 60 * 1000;
+    const saveState = () => localStorage.setItem('pomo-state', JSON.stringify(state));
+    const saveSettings = () => localStorage.setItem('pomo-settings', JSON.stringify(settings));
+
+    function todayKey() {
+      const d = new Date();
+      return `pomo-count-${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    }
+    const getToday = () => Number(localStorage.getItem(todayKey()) || 0);
+
+    function remainingMs() {
+      return state.running ? Math.max(0, state.endAt - Date.now()) : state.remaining;
+    }
+
+    function format(ms) {
+      const s = Math.ceil(ms / 1000);
+      return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+    }
+
+    function render() {
+      const ms = remainingMs();
+      const t = format(ms);
+      $('time').textContent = t;
+      $('label').textContent = LABELS[state.mode];
+      document.title = state.running ? `${t} - ${state.mode === 'work' ? '集中' : '休憩'}` : 'ポモドーロタイマー';
+      progressEl.style.strokeDashoffset = CIRC * (1 - ms / duration(state.mode));
+
+      document.body.dataset.mode = state.mode;
+      document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.mode === state.mode));
+      $('playIcon').style.display = state.running ? 'none' : '';
+      $('pauseIcon').style.display = state.running ? '' : 'none';
+
+      const dots = $('dots');
+      dots.innerHTML = '';
+      for (let i = 0; i < settings.interval; i++) {
+        const d = document.createElement('div');
+        d.className = 'dot' + (i < state.cycle ? ' done' : '');
+        dots.appendChild(d);
+      }
+      $('today').textContent = `今日の完了: ${getToday()} ポモドーロ`;
+    }
+
+    function tick() {
+      if (state.running && remainingMs() <= 0) finish();
+      render();
+    }
+
+    function start() {
+      unlockAudio();
+      state.running = true;
+      state.endAt = Date.now() + state.remaining;
+      saveState();
+      clearInterval(timerId);
+      timerId = setInterval(tick, 250);
+      requestWakeLock();
+      if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+      render();
+    }
+
+    function pause() {
+      state.remaining = remainingMs();
+      state.running = false;
+      saveState();
+      clearInterval(timerId);
+      releaseWakeLock();
+      render();
+    }
+
+    function switchMode(mode, keepRunning = false) {
+      state.mode = mode;
+      state.remaining = duration(mode);
+      state.running = false;
+      clearInterval(timerId);
+      saveState();
+      if (keepRunning) start(); else { releaseWakeLock(); render(); }
+    }
+
+    function nextMode() {
+      if (state.mode === 'work') {
+        state.cycle += 1;
+        if (state.cycle >= settings.interval) { state.cycle = 0; return 'long'; }
+        return 'short';
+      }
+      return 'work';
+    }
+
+    function finish() {
+      const wasWork = state.mode === 'work';
+      if (wasWork) localStorage.setItem(todayKey(), getToday() + 1);
+      alertUser(wasWork);
+      switchMode(nextMode(), settings.autoStart);
+    }
+
+    function skip() {
+      const next = state.mode === 'work' ? nextMode() : 'work';
+      switchMode(next, state.running);
+    }
+
+    function reset() {
+      switchMode(state.mode);
+    }
+
+    // ---- 通知・音・バイブ ----
+    function unlockAudio() {
+      if (!settings.sound) return;
+      try {
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+      } catch (e) {}
+    }
+
+    function beep() {
+      if (!settings.sound || !audioCtx) return;
+      const now = audioCtx.currentTime;
+      [0, 0.35, 0.7].forEach((offset, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = i === 2 ? 1046 : 880;
+        gain.gain.setValueAtTime(0.0001, now + offset);
+        gain.gain.exponentialRampToValueAtTime(0.4, now + offset + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.3);
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start(now + offset);
+        osc.stop(now + offset + 0.32);
+      });
+    }
+
+    function alertUser(wasWork) {
+      beep();
+      if (settings.vibrate && navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
+      const body = wasWork ? 'お疲れさま！休憩しましょう。' : '休憩終了。集中モードに戻りましょう。';
+      if ('Notification' in window && Notification.permission === 'granted' && document.visibilityState !== 'visible') {
+        navigator.serviceWorker?.ready
+          .then(reg => reg.showNotification('ポモドーロタイマー', { body, icon: 'icon-192.png', tag: 'pomo' }))
+          .catch(() => new Notification('ポモドーロタイマー', { body }));
+      }
+    }
+
+    // ---- 画面スリープ防止 ----
+    async function requestWakeLock() {
+      if (!settings.wakeLock || !('wakeLock' in navigator) || wakeLock) return;
+      try {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { wakeLock = null; });
+      } catch (e) {}
+    }
+    function releaseWakeLock() {
+      wakeLock?.release();
+      wakeLock = null;
+    }
+
+    // バックグラウンドから戻ったら時間を再計算し、Wake Lock を取り直す
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        tick();
+        if (state.running) requestWakeLock();
+      }
+    });
+
+    // ---- イベント ----
+    $('startBtn').addEventListener('click', () => state.running ? pause() : start());
+    $('resetBtn').addEventListener('click', reset);
+    $('skipBtn').addEventListener('click', skip);
+    document.querySelectorAll('.tabs button').forEach(b =>
+      b.addEventListener('click', () => {
+        if (b.dataset.mode === state.mode) return;
+        if (state.running && !confirm('タイマーを停止して切り替えますか？')) return;
+        switchMode(b.dataset.mode);
+      })
+    );
+
+    // 設定シート
+    const openSheet = open => {
+      $('sheet').classList.toggle('open', open);
+      $('backdrop').classList.toggle('open', open);
+    };
+    $('settingsBtn').addEventListener('click', () => openSheet(true));
+    $('closeSheet').addEventListener('click', () => openSheet(false));
+    $('backdrop').addEventListener('click', () => openSheet(false));
+
+    document.querySelectorAll('.stepper').forEach(el => {
+      const key = el.dataset.key, min = +el.dataset.min, max = +el.dataset.max;
+      const [minus, value, plus] = el.children;
+      const update = delta => {
+        const untouched = key === state.mode && !state.running && state.remaining === duration(state.mode);
+        settings[key] = Math.min(max, Math.max(min, settings[key] + delta));
+        value.textContent = settings[key];
+        saveSettings();
+        // 未開始のタイマーなら新しい時間を反映
+        if (untouched) state.remaining = duration(state.mode);
+        if (key === 'interval') state.cycle = Math.min(state.cycle, settings.interval - 1);
+        saveState();
+        render();
+      };
+      minus.addEventListener('click', () => update(-1));
+      plus.addEventListener('click', () => update(1));
+      value.textContent = settings[key];
+    });
+    document.querySelectorAll('.switch input').forEach(input => {
+      const key = input.dataset.key;
+      input.checked = settings[key];
+      input.addEventListener('change', () => {
+        settings[key] = input.checked;
+        saveSettings();
+        if (key === 'sound' && input.checked) { unlockAudio(); beep(); }
+        if (key === 'wakeLock') input.checked && state.running ? requestWakeLock() : releaseWakeLock();
+      });
+    });
+
+    // ---- 起動 ----
+    if (state.running) {
+      timerId = setInterval(tick, 250);
+      tick();
+    } else {
+      render();
+    }
+
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  </script>
+</body>
+</html>
